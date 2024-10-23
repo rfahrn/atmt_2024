@@ -29,16 +29,33 @@ cat $data/preprocessed/train.$tgt.p | perl moses_scripts/truecase.perl --model $
 
 # prepare remaining splits with learned models
 for split in valid test tiny_train
-do
-    cat $data/raw/$split.$src | perl moses_scripts/normalize-punctuation.perl -l $src | perl moses_scripts/tokenizer.perl -l $src -a -q | perl moses_scripts/truecase.perl --model $data/preprocessed/tm.$src > $data/preprocessed/$split.$src
-    cat $data/raw/$split.$tgt | perl moses_scripts/normalize-punctuation.perl -l $tgt | perl moses_scripts/tokenizer.perl -l $tgt -a -q | perl moses_scripts/truecase.perl --model $data/preprocessed/tm.$tgt > $data/preprocessed/$split.$tgt
-done
+    do
+        cat $data/raw/$split.$src | perl moses_scripts/normalize-punctuation.perl -l $src | perl moses_scripts/tokenizer.perl -l $src -a -q | perl moses_scripts/truecase.perl --model $data/preprocessed/tm.$src > $data/preprocessed/$split.$src
+        cat $data/raw/$split.$tgt | perl moses_scripts/normalize-punctuation.perl -l $tgt | perl moses_scripts/tokenizer.perl -l $tgt -a -q | perl moses_scripts/truecase.perl --model $data/preprocessed/tm.$tgt > $data/preprocessed/$split.$tgt
+    done
 
-# remove tmp files
-rm $data/preprocessed/train.$src.p
-rm $data/preprocessed/train.$tgt.p
+# Apply BPE dropout if specified
+dropout_prob=$4
+if [ ! -z "$dropout_prob" ]; then
+    echo "Applying BPE dropout with probability: $dropout_prob"
+    for split in train valid test tiny_train
+    do
+        python bpe_dropout.py --input $data/preprocessed/$split.$src \
+                              --output $data/preprocessed/${split}_bpe.$src \
+                              --dropout $dropout_prob
+        python bpe_dropout.py --input $data/preprocessed/$split.$tgt \
+                              --output $data/preprocessed/${split}_bpe.$tgt \
+                              --dropout $dropout_prob
+    done
+fi
 
 # preprocess all files for model training
-python preprocess.py --target-lang $tgt --source-lang $src --dest-dir $data/prepared/ --train-prefix $data/preprocessed/train --valid-prefix $data/preprocessed/valid --test-prefix $data/preprocessed/test --tiny-train-prefix $data/preprocessed/tiny_train --threshold-src 1 --threshold-tgt 1 --num-words-src 4000 --num-words-tgt 4000
+if [ -z "$dropout_prob" ]; then
+    # Baseline preprocessing
+    python preprocess.py --target-lang $tgt --source-lang $src --dest-dir $data/prepared/ --train-prefix $data/preprocessed/train --valid-prefix $data/preprocessed/valid --test-prefix $data/preprocessed/test --tiny-train-prefix $data/preprocessed/tiny_train --threshold-src 1 --threshold-tgt 1 --num-words-src 4000 --num-words-tgt 4000
+else
+    # BPE Dropout preprocessing
+    python preprocess.py --target-lang $tgt --source-lang $src --dest-dir $data/prepared_bpe/ --train-prefix $data/preprocessed/train_bpe --valid-prefix $data/preprocessed/valid_bpe --test-prefix $data/preprocessed/test_bpe --tiny-train-prefix $data/preprocessed/tiny_train_bpe --threshold-src 1 --threshold-tgt 1 --num-words-src 4000 --num-words-tgt 4000
+fi
 
-echo "done!"
+echo "done."

@@ -224,8 +224,8 @@ class LSTMDecoder(Seq2SeqDecoder):
         self.use_lexical_model = use_lexical_model
         if self.use_lexical_model:
             # __LEXICAL: Add parts of decoder architecture corresponding to the LEXICAL MODEL here
-            pass
-            # TODO: --------------------------------------------------------------------- /CUT
+            self.lexical_projection = nn.Linear(embed_dim, hidden_size)
+            # to do: --------------------------------------------------------------------- /CUT
 
     def forward(self, tgt_inputs, encoder_out, incremental_state=None):
         """ Performs the forward pass through the instantiated model. """
@@ -291,9 +291,11 @@ class LSTMDecoder(Seq2SeqDecoder):
 
                 if self.use_lexical_model:
                     # __LEXICAL: Compute and collect LEXICAL MODEL context vectors here
-                    # TODO: --------------------------------------------------------------------- CUT
-                    pass
-                    # TODO: --------------------------------------------------------------------- /CUT
+                    # todo: --------------------------------------------------------------------- CUT
+                    lexical_context = torch.max(src_embeddings, dim=1)[0] # max pooling _ or mean lexical_context = torch.mean(src_embeddings, dim=1)
+                    lexical_context = self.lexical_projection(lexical_context)  
+                    lexical_contexts.append(lexical_context)
+                    # todo: --------------------------------------------------------------------- /CUT
 
             input_feed = F.dropout(input_feed, p=self.dropout_out, training=self.training)
             rnn_outputs.append(input_feed)
@@ -313,10 +315,14 @@ class LSTMDecoder(Seq2SeqDecoder):
 
         if self.use_lexical_model:
             # __LEXICAL: Incorporate the LEXICAL MODEL into the prediction of target tokens here
-            pass
-            # TODO: --------------------------------------------------------------------- /CUT
-
-
+            #lexical_contexts = torch.stack(lexical_contexts, dim=0)  # shape: [tgt_time_steps, batch_size, hidden_size]
+            #rnn_outputs = torch.cat([rnn_outputs, lexical_contexts], dim=2)  # Concatenate along the hidden size dimension
+            lexical_contexts = torch.stack(lexical_contexts, dim=0)  # [tgt_time_steps, batch_size, hidden_size]
+            concatenated_outputs = torch.cat([rnn_outputs, lexical_contexts], dim=2)  # [tgt_time_steps, batch_size, 2*hidden_size]
+            decoder_output = self.final_projection(concatenated_outputs)
+            # todo: --------------------------------------------------------------------- /CUT
+        
+        
         return decoder_output, attn_weights
 
 
