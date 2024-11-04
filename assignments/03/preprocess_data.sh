@@ -1,61 +1,71 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # -*- coding: utf-8 -*-
 
+# Usage example:
+#   (atmt311) bash preprocess_data.sh data/en-fr en fr  
+#!/usr/bin/env bash
+# -*- coding: utf-8 -*-
+
+# Usage example:
+#   bash preprocess_data.sh /path/to/data src_lang tgt_lang
 set -e
 
-pwd=`dirname "$(readlink -f "$0")"`
-base=$pwd/../..
-src=fr
-tgt=en
-data=$base/data/$tgt-$src/
+base=$(dirname "$(readlink -f "$0")")/../..
+data=$1           # Data directory passed as the first argument
+src_lang=$2       # Source language passed as the second argument
+tgt_lang=$3       # Target language passed as the third argument
 
-# change into base directory to ensure paths are valid
-cd $base
+cd "$base" || exit
 
-# create preprocessed directory
-mkdir -p $data/preprocessed/
+mkdir -p "$data/preprocessed/"
+mkdir -p "$data/prepared/BPE"
+echo "preprocessing data for $src_lang-$tgt_lang"
 
-# normalize and tokenize raw data
-cat $data/raw/train.$src | perl moses_scripts/normalize-punctuation.perl -l $src | perl moses_scripts/tokenizer.perl -l $src -a -q > $data/preprocessed/train.$src.p
-cat $data/raw/train.$tgt | perl moses_scripts/normalize-punctuation.perl -l $tgt | perl moses_scripts/tokenizer.perl -l $tgt -a -q > $data/preprocessed/train.$tgt.p
+cat "$data/raw/train.$src_lang" | perl moses_scripts/normalize-punctuation.perl -l $src_lang | perl moses_scripts/tokenizer.perl -l $src_lang -a -q > "$data/preprocessed/train.$src_lang.p"
+cat "$data/raw/train.$tgt_lang" | perl moses_scripts/normalize-punctuation.perl -l $tgt_lang | perl moses_scripts/tokenizer.perl -l $tgt_lang -a -q > "$data/preprocessed/train.$tgt_lang.p"
+echo "normalizing and tokenizing done!"
 
-# train truecase models
-perl moses_scripts/train-truecaser.perl --model $data/preprocessed/tm.$src --corpus $data/preprocessed/train.$src.p
-perl moses_scripts/train-truecaser.perl --model $data/preprocessed/tm.$tgt --corpus $data/preprocessed/train.$tgt.p
+perl moses_scripts/train-truecaser.perl --model "$data/preprocessed/tm.$src_lang" --corpus "$data/preprocessed/train.$src_lang.p"
+perl moses_scripts/train-truecaser.perl --model "$data/preprocessed/tm.$tgt_lang" --corpus "$data/preprocessed/train.$tgt_lang.p"
 
-# apply truecase models to splits
-cat $data/preprocessed/train.$src.p | perl moses_scripts/truecase.perl --model $data/preprocessed/tm.$src > $data/preprocessed/train.$src 
-cat $data/preprocessed/train.$tgt.p | perl moses_scripts/truecase.perl --model $data/preprocessed/tm.$tgt > $data/preprocessed/train.$tgt
+cat "$data/preprocessed/train.$src_lang.p" | perl moses_scripts/truecase.perl --model "$data/preprocessed/tm.$src_lang" > "$data/preprocessed/train.$src_lang"
+cat "$data/preprocessed/train.$tgt_lang.p" | perl moses_scripts/truecase.perl --model "$data/preprocessed/tm.$tgt_lang" > "$data/preprocessed/train.$tgt_lang"
+echo "truecasing done!"
 
-# prepare remaining splits with learned models
 for split in valid test tiny_train
-    do
-        cat $data/raw/$split.$src | perl moses_scripts/normalize-punctuation.perl -l $src | perl moses_scripts/tokenizer.perl -l $src -a -q | perl moses_scripts/truecase.perl --model $data/preprocessed/tm.$src > $data/preprocessed/$split.$src
-        cat $data/raw/$split.$tgt | perl moses_scripts/normalize-punctuation.perl -l $tgt | perl moses_scripts/tokenizer.perl -l $tgt -a -q | perl moses_scripts/truecase.perl --model $data/preprocessed/tm.$tgt > $data/preprocessed/$split.$tgt
-    done
+do
+    cat "$data/raw/$split.$src_lang" | perl moses_scripts/normalize-punctuation.perl -l $src_lang | perl moses_scripts/tokenizer.perl -l $src_lang -a -q | perl moses_scripts/truecase.perl --model "$data/preprocessed/tm.$src_lang" > "$data/preprocessed/$split.$src_lang"
+    cat "$data/raw/$split.$tgt_lang" | perl moses_scripts/normalize-punctuation.perl -l $tgt_lang | perl moses_scripts/tokenizer.perl -l $tgt_lang -a -q | perl moses_scripts/truecase.perl --model "$data/preprocessed/tm.$tgt_lang" > "$data/preprocessed/$split.$tgt_lang"
+done
+echo "preprocessing done!"
 
-# Apply BPE dropout if specified
-dropout_prob=$4
-if [ ! -z "$dropout_prob" ]; then
-    echo "Applying BPE dropout with probability: $dropout_prob"
-    for split in train valid test tiny_train
-    do
-        python bpe_dropout.py --input $data/preprocessed/$split.$src \
-                              --output $data/preprocessed/${split}_bpe.$src \
-                              --dropout $dropout_prob
-        python bpe_dropout.py --input $data/preprocessed/$split.$tgt \
-                              --output $data/preprocessed/${split}_bpe.$tgt \
-                              --dropout $dropout_prob
-    done
-fi
+rm "$data/preprocessed/train.$src_lang.p"
+rm "$data/preprocessed/train.$tgt_lang.p"
+echo "cleaning up..."
 
-# preprocess all files for model training
-if [ -z "$dropout_prob" ]; then
-    # Baseline preprocessing
-    python preprocess.py --target-lang $tgt --source-lang $src --dest-dir $data/prepared/ --train-prefix $data/preprocessed/train --valid-prefix $data/preprocessed/valid --test-prefix $data/preprocessed/test --tiny-train-prefix $data/preprocessed/tiny_train --threshold-src 1 --threshold-tgt 1 --num-words-src 4000 --num-words-tgt 4000
-else
-    # BPE Dropout preprocessing
-    python preprocess.py --target-lang $tgt --source-lang $src --dest-dir $data/prepared_bpe/ --train-prefix $data/preprocessed/train_bpe --valid-prefix $data/preprocessed/valid_bpe --test-prefix $data/preprocessed/test_bpe --tiny-train-prefix $data/preprocessed/tiny_train_bpe --threshold-src 1 --threshold-tgt 1 --num-words-src 4000 --num-words-tgt 4000
-fi
+echo "learning BPE... using subword-nmt"
 
-echo "done."
+#C:/Users/rebec/miniconda3/envs/atmt311/Scripts/subword-nmt learn-bpe --input "$data/preprocessed/train.$src_lang" --output "$data/prepared/BPE/codes.$src_lang" --symbols 10000
+#C:/Users/rebec/miniconda3/envs/atmt311/Scripts/subword-nmt learn-bpe --input "$data/preprocessed/train.$tgt_lang" --output "$data/prepared/BPE/codes.$tgt_lang" --symbols 10000
+
+#C:/Users/rebec/miniconda3/envs/atmt311/Scripts/subword-nmt get-vocab --input "$data/preprocessed/train.$src_lang" --output "$data/prepared/BPE/dict.$src_lang"
+#C:/Users/rebec/miniconda3/envs/atmt311/Scripts/subword-nmt get-vocab --input "$data/preprocessed/train.$tgt_lang" --output "$data/prepared/BPE/dict.$tgt_lang"
+#echo "BPE learning done!"
+#source activate atmt311
+python -m subword_nmt.learn_bpe --input "$data/preprocessed/train.$src_lang" --output "$data/prepared/BPE/codes.$src_lang" --symbols 10000
+python -m subword_nmt.learn_bpe --input "$data/preprocessed/train.$tgt_lang" --output "$data/prepared/BPE/codes.$tgt_lang" --symbols 10000
+
+python -m subword_nmt.get_vocab --input "$data/preprocessed/train.$src_lang" --output "$data/prepared/BPE/dict.$src_lang"
+python -m subword_nmt.get_vocab --input "$data/preprocessed/train.$tgt_lang" --output "$data/prepared/BPE/dict.$tgt_lang"
+
+# For apply-bpe calls, also use python -m
+for split in train tiny_train test valid
+do
+  python -m subword_nmt.apply_bpe --input "$data/preprocessed/$split.$src_lang" --codes "$data/prepared/BPE/codes.$src_lang" --output "$data/prepared/BPE/$split.$src_lang" --vocabulary "$data/prepared/BPE/dict.$src_lang"
+  python -m subword_nmt.apply_bpe --input "$data/preprocessed/$split.$tgt_lang" --codes "$data/prepared/BPE/codes.$tgt_lang" --output "$data/prepared/BPE/$split.$tgt_lang" --vocabulary "$data/prepared/BPE/dict.$tgt_lang"
+done
+
+
+python preprocess.py --target-lang $tgt --source-lang $src --dest-dir $data/prepared/BPE --train-prefix $data/prepared/BPE/train --valid-prefix $data/prepared/BPE/valid --test-prefix $data/prepared/BPE/test --tiny-train-prefix $data/prepared/BPE/tiny_train --threshold-src 12 --threshold-tgt 12 --num-words-src 3000 --num-words-tgt 3000 --vocab-src $data/prepared/BPE/dict.fr --vocab-trg $data/prepared/BPE/dict.en
+
+echo "done!"

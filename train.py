@@ -28,7 +28,6 @@ def get_args():
 
     # Add model arguments
     parser.add_argument('--arch', default='lstm', choices=ARCH_MODEL_REGISTRY.keys(), help='model architecture')
-    parser.add_argument('--decoder-use-lexical-model', action='store_true', help='enable lexical model in the decoder')
 
     # Add optimization arguments
     parser.add_argument('--max-epoch', default=10000, type=int, help='force stop training at specified epoch')
@@ -52,13 +51,6 @@ def get_args():
     args = parser.parse_args()
     ARCH_CONFIG_REGISTRY[args.arch](args)
     return args
-
-def apply_bpe_dropout(data, dropout_prob=0.1):
-    """Apply BPE-dropout to the training data."""
-    # Here you would add logic to apply BPE dropout, adjusting segmentation
-    # For example purposes, this will be a placeholder function
-    return data  # Return modified data
-
 
 
 def main(args):
@@ -106,14 +98,8 @@ def main(args):
     best_validate = float('inf')
 
     for epoch in range(last_epoch + 1, args.max_epoch):
-        if epoch == 0 or args.adaptive_dropout:  # Only run BPE-dropout on the first epoch or if adaptive is enabled
-            exit_code = os.system(f"bash scripts/preprocess_data.sh {args.data} {args.source_lang} {args.target_lang} 0.1")
-            if exit_code != 0:
-                logging.error("BPE-Dropout preprocessing failed. Exiting.")
-                break
-        #train_dataset.src_data = apply_bpe_dropout(train_dataset.src_data)
-        #train_dataset.tgt_data = apply_bpe_dropout(train_dataset.tgt_data)
-        train_loader = torch.utils.data.DataLoader(train_dataset, num_workers=1, collate_fn=train_dataset.collater,
+        train_loader = \
+            torch.utils.data.DataLoader(train_dataset, num_workers=1, collate_fn=train_dataset.collater,
                                         batch_sampler=BatchSampler(train_dataset, args.max_tokens, args.batch_size, 1,
                                                                    0, shuffle=False, seed=42))
         model.train()
@@ -131,8 +117,6 @@ def main(args):
         for i, sample in enumerate(progress_bar):
             if args.cuda:
                 sample = utils.move_to_cuda(sample)
-                model = model.cuda() # added
-                criterion = criterion.cuda() # added
             if len(sample) == 0:
                 continue
             model.train()
