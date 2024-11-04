@@ -28,7 +28,7 @@ def get_args():
 
     # Add model arguments
     parser.add_argument('--arch', default='lstm', choices=ARCH_MODEL_REGISTRY.keys(), help='model architecture')
-    parser.add_argument('--decoder-use-lexical-model', type=str, default='True', help='Use the lexical model')  # Set default to True
+    parser.add_argument('--decoder-use-lexical-model', action='store_true', help='enable lexical model in the decoder')
 
     # Add optimization arguments
     parser.add_argument('--max-epoch', default=10000, type=int, help='force stop training at specified epoch')
