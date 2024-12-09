@@ -1,0 +1,55 @@
+
+
+sacrebleu data/en-sv/infopankki/prepared/test.en -i assignments/01/baseline/translations_k1.txt -m bleu --width 4
+sacrebleu data/en-sv/infopankki/prepared/test.en -i assignments/01/baseline/translations_k5.txt -m bleu --width 4
+sacrebleu data/en-sv/infopankki/prepared/test.en -i assignments/01/baseline/translations_k10.txt -m bleu --width 4
+sacrebleu data/en-sv/infopankki/prepared/test.en -i assignments/01/baseline/translations_k15.txt -m bleu --width 4
+sacrebleu data/en-sv/infopankki/prepared/test.en -i assignments/01/baseline/translations_k20.txt -m bleu --width 4
+sacrebleu data/en-sv/infopankki/prepared/test.en -i assignments/01/baseline/translations_k25.txt -m bleu --width 4
+
+# then.
+
+import matplotlib.pyplot as plt
+
+# Data
+beam_sizes = [1, 5, 10, 15, 20, 25]
+bleu_scores = [XX.XX, XX.XX, XX.XX, XX.XX, XX.XX, XX.XX]  # Replace with your BLEU scores
+brevity_penalty = [YY.YY, YY.YY, YY.YY, YY.YY, YY.YY, YY.YY]  # Replace with your brevity penalties
+decoding_time = [ZZ.ZZ, ZZ.ZZ, ZZ.ZZ, ZZ.ZZ, ZZ.ZZ, ZZ.ZZ]  # Replace with decoding times
+
+# Plot BLEU and Brevity Penalty
+fig, ax1 = plt.subplots()
+
+ax1.set_xlabel('Beam Size (k)')
+ax1.set_ylabel('BLEU Score', color='blue')
+ax1.plot(beam_sizes, bleu_scores, label='BLEU Score', marker='o', color='blue')
+ax1.tick_params(axis='y', labelcolor='blue')
+
+ax2 = ax1.twinx()  # Second y-axis for brevity penalty
+ax2.set_ylabel('Brevity Penalty', color='red')
+ax2.plot(beam_sizes, brevity_penalty, label='Brevity Penalty', marker='x', color='red')
+ax2.tick_params(axis='y', labelcolor='red')
+
+# Decoding Time as a Secondary Plot
+plt.figure()
+plt.plot(beam_sizes, decoding_time, label='Decoding Time', marker='s', color='green')
+plt.xlabel('Beam Size (k)')
+plt.ylabel('Decoding Time (s)')
+plt.title('Decoding Time vs Beam Size')
+plt.legend()
+
+# Show plots
+plt.tight_layout()
+plt.show()
+
+Step 7: Write the Report
+
+In your report:
+
+    Explain the trends in BLEU Score and Brevity Penalty:
+        BLEU scores often improve up to a point, then plateau or decrease due to overly long translations.
+        Brevity penalty often decreases as beam size increases because larger beam sizes favor longer translations.
+    Analyze Decoding Time:
+        Larger beam sizes increase decoding time significantly due to the exploration of more hypotheses.
+    Conclude:
+        Discuss the trade-offs between translation quality (BLEU), decoding time, and brevity penalty.
